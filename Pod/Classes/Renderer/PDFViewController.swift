@@ -37,7 +37,7 @@ open class PDFViewController: UIViewController {
     open var isPresentingInModal: Bool = false
     
     /// The scroll direction of the reader
-    open var scrollDirection: UICollectionViewScrollDirection = .horizontal
+    open var scrollDirection: UICollectionView.ScrollDirection = .horizontal
     
     /// A reference to the document that is being displayed
     var document: PDFDocument!
@@ -171,7 +171,7 @@ open class PDFViewController: UIViewController {
         super.viewWillTransition(to: size, with: coordinator)
         
         coordinator.animate(alongsideTransition: { (context) in
-            self.collectionView.contentInset = UIEdgeInsetsMake(self.topLayoutGuide.length, 0, self.bottomLayoutGuide.length, 0)
+            self.collectionView.contentInset = UIEdgeInsets(top: self.topLayoutGuide.length, left: 0, bottom: self.bottomLayoutGuide.length, right: 0)
             self.collectionView.collectionViewLayout.invalidateLayout()
             self.pageScrubber.sizeToFit()
         }, completion: { (context) in
@@ -253,8 +253,8 @@ open class PDFViewController: UIViewController {
         
         return thumbsBarButtonItem
     }
-    
-    func toggleAnnotations(_ button: PDFBarButton) {
+
+    @objc func toggleAnnotations(_ button: PDFBarButton) {
         showingAnnotations = !showingAnnotations
         reloadBarButtons()
     }
@@ -278,7 +278,7 @@ open class PDFViewController: UIViewController {
         present(activityVC, animated: true, completion: nil)
     }
     
-    func showThumbnailView() {
+    @objc func showThumbnailView() {
         let vc = PDFThumbnailViewController(document: document)
         vc.delegate = self
         let nvc = UINavigationController(rootViewController: vc)
@@ -313,11 +313,11 @@ open class PDFViewController: UIViewController {
         self.toggleBars()
     }
     
-    func shareDocument() {
+    @objc func shareDocument() {
         self.shareBarButtonAction()
     }
     
-    func dismissModal() {
+    @objc func dismissModal() {
         dismiss(animated: true, completion: nil)
     }
 }
