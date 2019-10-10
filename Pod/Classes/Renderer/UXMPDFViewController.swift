@@ -272,25 +272,13 @@ open class UXMPDFViewController: UIViewController {
         var buttons: [UIBarButtonItem] = []
         
         if allowsSharing {
-
-            let shareFormBarButtonItem = UXMBarButton(
-                image: UIImage.bundledImage("share"),
-                toggled: false,
-                target: self,
-                action: #selector(UXMPDFViewController.shareDocument)
-            )
+            let shareFormBarButtonItem = buildShareFormBarButtonItem()
             buttons.append(shareFormBarButtonItem)
             self.shareBarButtonItem = shareFormBarButtonItem
         }
         
-        buttons.append(UXMBarButton(
-            image: UIImage.bundledImage("thumbs"),
-            toggled: false,
-            target: self,
-            action: #selector(UXMPDFViewController.showThumbnailView)
-            )
-        )
-        
+        let thumbsBarButtonItem = buildThumbsBarButtonItem()
+        buttons.append(thumbsBarButtonItem)
         
         if allowsAnnotations {
             if showingAnnotations {
@@ -311,7 +299,27 @@ open class UXMPDFViewController: UIViewController {
         
         return buttons
     }
-    
+    private func buildShareFormBarButtonItem() -> UXMBarButton {
+        let shareFormBarButtonItem = UXMBarButton(
+            image: UIImage.bundledImage("share"),
+            toggled: false,
+            target: self,
+            action: #selector(UXMPDFViewController.shareDocument)
+        )
+
+        return shareFormBarButtonItem
+    }
+
+    private func buildThumbsBarButtonItem() -> UXMBarButton {
+        let thumbsBarButtonItem = UXMBarButton(
+            image: UIImage.bundledImage("thumbs"),
+            toggled: false,
+            target: self,
+            action: #selector(UXMPDFViewController.showThumbnailView)
+        )
+
+        return thumbsBarButtonItem
+    }
     @objc func toggleAnnotations(_ button: UXMBarButton) {
         showingAnnotations = !showingAnnotations
         reloadBarButtons()
