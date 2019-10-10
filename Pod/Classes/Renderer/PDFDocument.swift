@@ -118,11 +118,10 @@ open class PDFDocument: NSObject, NSCoding {
     }
     
     func loadDocumentInformation() {
-        guard let pdfDocRef = documentRef else {
-            return
+        guard let pdfDocRef = documentRef, let infoDic = pdfDocRef.info else {
+                 return
         }
         
-        let infoDic: CGPDFDictionaryRef = pdfDocRef.info!
         var string: CGPDFStringRef? = nil
         
         if CGPDFDictionaryGetString(infoDic, "Title", &string) {
