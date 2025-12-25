@@ -6,106 +6,109 @@
 //
 //
 
-import UIKit
 import SafariServices
+import UIKit
 
-public protocol UXMPDFViewControllerDelegate : class {
+public protocol UXMPDFViewControllerDelegate: class {
     func editingDidEnd(_ document: UXMPDFDocument)
 }
 
 open class UXMPDFViewController: UIViewController {
     /// Delegate reference for editing events
     open weak var delegate: UXMPDFViewControllerDelegate? = nil
-    
+
     /// A boolean value that determines whether show and use only pen tool
     open var signatureMode: Bool = false
-    
+
     /// A boolean value that determines whether the navigation bar and scrubber bar hide on screen tap
     open var hidesBarsOnTap: Bool = false
-    
+
     /// A boolean value that determines if the scrubber bar should be visible
     open var showsScrubber: Bool = true {
         didSet {
             pageScrubber?.isHidden = !showsScrubber
-            collectionView?.contentInset.bottom = showsScrubber && pageScrubber != nil ? pageScrubber!.frame.size.height : 0.0
+            collectionView?.contentInset.bottom =
+                showsScrubber && pageScrubber != nil ? pageScrubber!.frame.size.height : 0.0
         }
     }
-    
+
     /// A boolean value that determines if a PDF should have fillable form elements
     open var allowsFormFilling: Bool = true
-    
+
     /// A boolean value that determines if annotations are allowed
     open var allowsAnnotations: Bool = true
-    
+
     /// A boolean value that determines if sharing should be allowed
     open var allowsSharing: Bool = true
-    
+
     /// A boolean value that determines if view controller is displayed as modal
     open var isPresentingInModal: Bool = false
-    
-    open var modalDoneButtonTouched: (() -> ())?
-    
+
+    open var modalDoneButtonTouched: (() -> Void)?
+
     /// The scroll direction of the reader
     open var scrollDirection: UICollectionView.ScrollDirection = .horizontal
-    
+
     /// A reference to the document that is being displayed
     open var document: UXMPDFDocument? {
         didSet {
             self.setupUI()
         }
     }
-    
+
     /// A reference to the share button
     var shareBarButtonItem: UIBarButtonItem?
-    
+
     /// The share button icon
     open lazy var shareBarButtonIcon: UIImage? = UIImage.bundledImage("share")
 
     /// The thumbs button icon
     open lazy var thumbsBarButtonIcon: UIImage? = UIImage.bundledImage("thumbs")
 
-    
     /// A closure that defines an action to take upon selecting the share button.
     /// The default action brings up a UIActivityViewController
-    open lazy var shareBarButtonAction: () -> () = { self.showActivitySheet() }
-    
+    open lazy var shareBarButtonAction: () -> Void = { self.showActivitySheet() }
+
     /// A closure that defines what happens on viewWillDisappear.
     /// The default is to assign the annotations out of the annotationController into
     /// the document, then call document.save()
-    open lazy var autoSaveAction: ((UXMPDFDocument, UXMAnnotationController) -> ())? = { document, annotationController in
+    open lazy var autoSaveAction: ((UXMPDFDocument, UXMAnnotationController) -> Void)? = {
+        document, annotationController in
         document.annotationsStore = annotationController.annotationsStore
         document.save()
-        
+
         if self.edited {
             self.delegate?.editingDidEnd(document)
         }
     }
-    
+
     /// A reference to the collection view handling page presentation
     var collectionView: UXMSinglePageViewer?
-    
+
     /// A reference to the page scrubber bar
     open var pageScrubber: UXMPageScrubber?
-    
+
     open var hasAnnotations: Bool {
         guard document != nil else { return false }
         return annotationController.annotationsStore.hasAnnotations
     }
-    
-    private(set) open lazy var formController: UXMFormViewController = UXMFormViewController(document: self.document!)
-    private(set) open lazy var annotationController: UXMAnnotationController = UXMAnnotationController(document: self.document!, delegate: self)
-    
+
+    private(set) open lazy var formController: UXMFormViewController = UXMFormViewController(
+        document: self.document!)
+    private(set) open lazy var annotationController: UXMAnnotationController =
+        UXMAnnotationController(document: self.document!, delegate: self)
+
     fileprivate var showingAnnotations = false
     fileprivate var showingFormFilling = true
-    
+
     fileprivate var edited = false
-    
+
     /**
      Initializes a new reader with a given document
-     
+    
      - Parameters:
      - document: The document to display
-     
+    
      - Returns: An instance of the UXMPDFViewController
      */
     public init(document: UXMPDFDocument) {
@@ -115,124 +118,154 @@ open class UXMPDFViewController: UIViewController {
             self.dismiss(animated: true, completion: nil)
         }
     }
-    
+
     /**
      Initializes a new reader with a given document and annotation controller
-     
+    
      - Parameters:
      - document: The document to display
      - annotationController: The controller to supervise annotations
-     
+    
      - Returns: An instance of the UXMPDFViewController
      */
-    public convenience init(document: UXMPDFDocument, annotationController: UXMAnnotationController) {
+    public convenience init(document: UXMPDFDocument, annotationController: UXMAnnotationController)
+    {
         self.init(document: document)
         self.annotationController = annotationController
     }
-    
+
     required public init?(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
     }
-    
+
     override open func viewDidLoad() {
         super.viewDidLoad()
-        
+
         self.setupUI()
     }
-    
+
     fileprivate func setupUI() {
-        
-        guard self.isViewLoaded, let document = self.document, document.pageCount > 0 else { return }
-        
-        pageScrubber = UXMPageScrubber(frame: CGRect(x: 0, y: view.frame.size.height - bottomLayoutGuide.length, width: view.frame.size.width, height: 44), document: document)
+
+        guard self.isViewLoaded, let document = self.document, document.pageCount > 0 else {
+            return
+        }
+
+        let bottomInset: CGFloat
+        if #available(iOS 11.0, *) {
+            bottomInset = view.safeAreaInsets.bottom
+        } else {
+            bottomInset = bottomLayoutGuide.length
+        }
+        pageScrubber = UXMPageScrubber(
+            frame: CGRect(
+                x: 0, y: view.frame.size.height - bottomInset, width: view.frame.size.width,
+                height: 44), document: document)
         pageScrubber!.scrubberDelegate = self
         pageScrubber!.translatesAutoresizingMaskIntoConstraints = false
-        
+
         collectionView = UXMSinglePageViewer(frame: view.bounds, document: document)
         collectionView!.translatesAutoresizingMaskIntoConstraints = false
         collectionView!.singlePageDelegate = self
-        
+
         let flowLayout = collectionView!.collectionViewLayout as! UICollectionViewFlowLayout
         flowLayout.scrollDirection = scrollDirection
-        
+
         switch scrollDirection {
         case .horizontal:
             collectionView!.isPagingEnabled = true
             pageScrubber!.isHidden = !showsScrubber
-            collectionView!.contentInset.bottom = showsScrubber ? pageScrubber!.frame.size.height : 0.0
+            collectionView!.contentInset.bottom =
+                showsScrubber ? pageScrubber!.frame.size.height : 0.0
         case .vertical:
             collectionView!.isPagingEnabled = false
             pageScrubber!.isHidden = true
         }
-        
+
         view.addSubview(collectionView!)
         view.addSubview(pageScrubber!)
         view.addSubview(annotationController.view)
-        
+
         collectionView!.leadingAnchor.constraint(equalTo: view.leadingAnchor).isActive = true
         collectionView!.trailingAnchor.constraint(equalTo: view.trailingAnchor).isActive = true
         collectionView!.topAnchor.constraint(equalTo: view.topAnchor).isActive = true
         collectionView!.bottomAnchor.constraint(equalTo: view.bottomAnchor).isActive = true
-        
+
         if #available(iOS 11.0, *) {
-            pageScrubber!.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor).isActive = true
-        }else {
+            pageScrubber!.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
+                .isActive = true
+        } else {
             pageScrubber!.bottomAnchor.constraint(equalTo: view.bottomAnchor).isActive = true
         }
-        
+
         pageScrubber!.leadingAnchor.constraint(equalTo: view.leadingAnchor).isActive = true
         pageScrubber!.trailingAnchor.constraint(equalTo: view.trailingAnchor).isActive = true
         pageScrubber!.heightAnchor.constraint(equalToConstant: 44).isActive = true
         pageScrubber!.sizeToFit()
-        
+
         reloadBarButtons()
-        
+
         collectionView!.reloadItems(at: [IndexPath(row: 0, section: 0)])
     }
-    
+
     open override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        
-        NotificationCenter.default.addObserver(self, selector: #selector(orientationDidChange(_:)), name: UIDevice.orientationDidChangeNotification, object: nil)
-        
+
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(orientationDidChange(_:)),
+            name: UIDevice.orientationDidChangeNotification, object: nil)
+
         collectionView?.collectionViewLayout.invalidateLayout()
     }
-    
+
     open override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        
+
         collectionView?.collectionViewLayout.invalidateLayout()
-        
+
         view.layoutSubviews()
     }
-    
+
     open override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        
+
         NotificationCenter.default.removeObserver(self)
-        
+
         guard document != nil else { return }
-        
+
         self.annotationController.finishAnnotation()
         autoSaveAction?(self.document!, self.annotationController)
     }
-    
-    open override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+
+    open override func viewWillTransition(
+        to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator
+    ) {
         super.viewWillTransition(to: size, with: coordinator)
-        
+
         guard document != nil else { return }
-        
-        coordinator.animate(alongsideTransition: { [weak self] (context) in
-            guard let zelf = self else { return }
-            zelf.collectionView?.contentInset = UIEdgeInsets(top: zelf.topLayoutGuide.length, left: 0, bottom: zelf.bottomLayoutGuide.length, right: 0)
-            zelf.collectionView?.collectionViewLayout.invalidateLayout()
-            zelf.pageScrubber?.sizeToFit()
-        }, completion: { [weak self] (context) in
-            guard let zelf = self else { return }
-            zelf.collectionView?.displayPage(zelf.document!.currentPage, animated: false)
-        })
+
+        coordinator.animate(
+            alongsideTransition: { [weak self] (context) in
+                guard let zelf = self else { return }
+                let topInset: CGFloat
+                let bottomInset: CGFloat
+                if #available(iOS 11.0, *) {
+                    topInset = zelf.view.safeAreaInsets.top
+                    bottomInset = zelf.view.safeAreaInsets.bottom
+                } else {
+                    topInset = zelf.topLayoutGuide.length
+                    bottomInset = zelf.bottomLayoutGuide.length
+                }
+                zelf.collectionView?.contentInset = UIEdgeInsets(
+                    top: topInset, left: 0, bottom: bottomInset, right: 0)
+                zelf.collectionView?.collectionViewLayout.invalidateLayout()
+                zelf.pageScrubber?.sizeToFit()
+            },
+            completion: { [weak self] (context) in
+                guard let zelf = self else { return }
+                zelf.collectionView?.displayPage(zelf.document!.currentPage, animated: false)
+            })
     }
-    
+
     //MARK: - Private helpers
     fileprivate func scrollTo(page: Int) {
         document?.currentPage = page
@@ -241,52 +274,57 @@ open class UXMPDFViewController: UIViewController {
             pageScrubber?.updateScrubber()
         }
     }
-    
+
     fileprivate func reloadBarButtons() {
-        
+
         guard document != nil else { return }
-        
+
         navigationItem.rightBarButtonItems = rightBarButtons()
-        
+
         if isPresentingInModal {
-            navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(UXMPDFViewController.dismissModal))
+            navigationItem.leftBarButtonItem = UIBarButtonItem(
+                barButtonSystemItem: .done, target: self,
+                action: #selector(UXMPDFViewController.dismissModal))
         }
     }
-    
+
     open func rightBarButtons() -> [UIBarButtonItem] {
-        if (signatureMode) {
+        if signatureMode {
             var buttons = self.navigationItem.rightBarButtonItems ?? []
-            
+
             // undo button
             buttons.append(annotationController.undoButton)
-            
+
             // find the draw button (hopefully you added that thing huh?)
-            if let penButton = annotationController.buttons.filter({ (button: UXMBarButton) -> Bool in
+            if let penButton = annotationController.buttons.filter({
+                (button: UXMBarButton) -> Bool in
                 if let annotationButton = button as? PDFAnnotationBarButton {
                     return annotationButton.annotationType == PDFPenAnnotation.self
                 }
                 return false
             }).first {
-                buttons.append(penButton);
+                buttons.append(penButton)
+            } else {
+                assert(
+                    false,
+                    "Used 'signatureMode' of true, but did NOT provide the PDFPenAnnotationBarButton as an annotation! No Sign button for you!"
+                )
             }
-            else {
-                assert(false, "Used 'signatureMode' of true, but did NOT provide the PDFPenAnnotationBarButton as an annotation! No Sign button for you!")
-            }
-            
+
             return buttons
         }
-        
+
         var buttons: [UIBarButtonItem] = []
-        
+
         if allowsSharing {
             let shareFormBarButtonItem = buildShareFormBarButtonItem()
             buttons.append(shareFormBarButtonItem)
             self.shareBarButtonItem = shareFormBarButtonItem
         }
-        
+
         let thumbsBarButtonItem = buildThumbsBarButtonItem()
         buttons.append(thumbsBarButtonItem)
-        
+
         if allowsAnnotations {
             if showingAnnotations {
                 buttons.append(annotationController.undoButton)
@@ -294,16 +332,17 @@ open class UXMPDFViewController: UIViewController {
                     buttons.append(button)
                 }
             }
-            
-            buttons.append(UXMBarButton(
-                image: UIImage.bundledImage("annot"),
-                toggled: showingAnnotations,
-                target: self,
-                action: #selector(UXMPDFViewController.toggleAnnotations(_:))
+
+            buttons.append(
+                UXMBarButton(
+                    image: UIImage.bundledImage("annot"),
+                    toggled: showingAnnotations,
+                    target: self,
+                    action: #selector(UXMPDFViewController.toggleAnnotations(_:))
                 )
             )
         }
-        
+
         return buttons
     }
     private func buildShareFormBarButtonItem() -> UXMBarButton {
@@ -331,17 +370,19 @@ open class UXMPDFViewController: UIViewController {
         showingAnnotations = !showingAnnotations
         reloadBarButtons()
     }
-    
+
     open func saveToPDFFile(overwriteOriginal: Bool = false) -> URL? {
-        
+
         guard document != nil else { return nil }
-        
+
         self.annotationController.finishAnnotation()
-        let renderer = UXMRenderController(document: document!, controllers: [
-            annotationController,
-            formController
-        ])
-        
+        let renderer = UXMRenderController(
+            document: document!,
+            controllers: [
+                annotationController,
+                formController,
+            ])
+
         if overwriteOriginal {
             if renderer.save() {
                 document!.clearEncodedAnnotations()
@@ -349,25 +390,27 @@ open class UXMPDFViewController: UIViewController {
             }
             return nil
         }
-        
+
         let pdf = renderer.renderOntoPDF()
         return pdf
     }
-    
+
     func showActivitySheet() {
-        
+
         guard document != nil else { return }
-        
+
         self.annotationController.finishAnnotation()
-        let renderer = UXMRenderController(document: document!, controllers: [
-            annotationController,
-            formController
+        let renderer = UXMRenderController(
+            document: document!,
+            controllers: [
+                annotationController,
+                formController,
             ])
         let pdf = renderer.renderOntoPDF()
-        
+
         let items = [pdf]
         let activityVC = UIActivityViewController(activityItems: items, applicationActivities: nil)
-        
+
         if UIDevice.current.userInterfaceIdiom == .pad {
             activityVC.modalPresentationStyle = .popover
             let popController = activityVC.popoverPresentationController
@@ -376,44 +419,43 @@ open class UXMPDFViewController: UIViewController {
         }
         present(activityVC, animated: true, completion: nil)
     }
-    
+
     @objc func showThumbnailView() {
-        
+
         guard document != nil else { return }
-        
+
         let vc = UXMThumbnailViewController(document: document!)
         vc.delegate = self
         let nvc = UINavigationController(rootViewController: vc)
         nvc.modalTransitionStyle = .crossDissolve
         present(nvc, animated: true, completion: nil)
     }
-    
+
     func hideBars(state: Bool) {
         navigationController?.setNavigationBarHidden(state, animated: true)
-        
+
         switch scrollDirection {
         case .horizontal:
             if showsScrubber {
                 pageScrubber?.isHidden = state
-            }
-            else {
+            } else {
                 pageScrubber?.isHidden = true
             }
         case .vertical:
             pageScrubber?.isHidden = true
         }
     }
-    
+
     //MARK: - IBActions
-    
+
     @objc func shareDocument() {
         self.shareBarButtonAction()
     }
-    
+
     @objc func dismissModal() {
         modalDoneButtonTouched?()
     }
-    
+
     @objc private func orientationDidChange(_ notification: Notification? = nil) {
         self.pageScrubber?.refreshScrubber()
     }
@@ -422,9 +464,11 @@ open class UXMPDFViewController: UIViewController {
 extension UXMPDFViewController: UXMAnnotationControllerProtocol {
     public func annotationWillStart(touch: UITouch) -> Int? {
         self.edited = true
-        
+
         let tapPoint = touch.location(in: collectionView)
-        guard let pageIndex = collectionView?.indexPathForItem(at: tapPoint)?.row else { return nil }
+        guard let pageIndex = collectionView?.indexPathForItem(at: tapPoint)?.row else {
+            return nil
+        }
         let index = pageIndex + 1
         return index
     }
@@ -438,17 +482,19 @@ extension UXMPDFViewController: UXMPageScrubberDelegate {
 
 extension UXMPDFViewController: UXMSinglePageViewerDelegate {
     public func singlePageViewer(_ collectionView: UXMSinglePageViewer, didDisplayPage page: Int) {
-        
+
         document?.currentPage = page
         if showsScrubber {
             pageScrubber?.updateScrubber()
         }
     }
-    
-    public func singlePageViewer(_ collectionView: UXMSinglePageViewer, loadedContent content: UXMPageContentView) {
-        
+
+    public func singlePageViewer(
+        _ collectionView: UXMSinglePageViewer, loadedContent content: UXMPageContentView
+    ) {
+
         guard document != nil else { return }
-        
+
         if allowsFormFilling {
             formController.showForm(content)
         }
@@ -456,38 +502,45 @@ extension UXMPDFViewController: UXMSinglePageViewerDelegate {
             annotationController.showAnnotations(content)
         }
     }
-    
-    public func singlePageViewer(_ collectionView: UXMSinglePageViewer, selected action: UXMAction) {
-        if let action = action as? UXMActionURL, let scheme = action.url.scheme?.lowercased(), (scheme == "http" || scheme == "https") {
+
+    public func singlePageViewer(_ collectionView: UXMSinglePageViewer, selected action: UXMAction)
+    {
+        if let action = action as? UXMActionURL, let scheme = action.url.scheme?.lowercased(),
+            scheme == "http" || scheme == "https"
+        {
             let svc = SFSafariViewController(url: action.url)
             present(svc, animated: true, completion: nil)
         } else if let action = action as? UXMActionGoTo {
             collectionView.displayPage(action.pageIndex, animated: true)
         }
     }
-    
-    public func singlePageViewer(_ collectionView: UXMSinglePageViewer, selected annotation: UXMPDFAnnotationView) {
-        
+
+    public func singlePageViewer(
+        _ collectionView: UXMSinglePageViewer, selected annotation: UXMPDFAnnotationView
+    ) {
+
         guard document != nil else { return }
-        
+
         if let annotation = annotation.parent {
             annotationController.select(annotation: annotation)
         }
     }
-    
-    public func singlePageViewer(_ collectionView: UXMSinglePageViewer, tapped recognizer: UITapGestureRecognizer) {
-        
+
+    public func singlePageViewer(
+        _ collectionView: UXMSinglePageViewer, tapped recognizer: UITapGestureRecognizer
+    ) {
+
         guard document != nil else { return }
-        
+
         annotationController.select(annotation: nil)
     }
-    
+
     public func singlePageViewerDidBeginDragging() {
-      // Do not hide navbar
+        // Do not hide navbar
         self.hideBars(state: false)
     }
-    
-    public func singlePageViewerDidEndDragging() { }
+
+    public func singlePageViewerDidEndDragging() {}
 }
 
 extension UXMPDFViewController: UXMThumbnailViewControllerDelegate {
